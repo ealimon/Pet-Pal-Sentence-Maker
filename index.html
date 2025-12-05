@@ -335,7 +335,8 @@
         }
         
         // Change button text for level up
-        modalCloseButton.textContent = isLevelUp ? "Continue to Next Level!" : "Fetch Next Sentence!";
+        modalCloseButton.textContent = isLevelUp ? "Continue to Next Level!" : 
+                                       (title.includes("Game Over!") ? "Play Again!" : "Fetch Next Sentence!");
         
         modalBackdrop.classList.remove('hidden');
         modalBackdrop.classList.add('flex');
@@ -343,11 +344,14 @@
         modalCloseButton.onclick = () => {
             modalBackdrop.classList.remove('flex');
             modalBackdrop.classList.add('hidden');
+            
             // If it was a success modal (sentence solved or level up), load the next sentence
             if (title.includes("Pawsitively Perfect!") || title.includes("LEVEL UP!")) {
                 loadNextLevel(); 
+            } else if (title.includes("Game Over!")) {
+                // Restart the game for "Game Over"
+                resetGame();
             }
-            // Note: If the title is "Game Over!", loadNextLevel() is not called, which prevents the error.
         };
     }
     
@@ -425,7 +429,12 @@
 
         // If the data is undefined, it means we have run out of sentences (Game Over)
         if (!data) {
-            showModal("Game Over!", "You've mastered all the Pet Pal sentences! Your final score is " + score + ".");
+            // --- UPDATED FINAL MESSAGE ---
+            showModal(
+                "Game Over!", 
+                "🎉 Thank you for learning! You've successfully completed every sentence and are now a Sight Word Superstar! Your final score is " + score + ". Click 'Play Again!' to start over.",
+                false
+            );
             return;
         }
 
@@ -442,7 +451,7 @@
         
         // 1. Create a regular expression to find **ANY_CASE_OF_THE_CORRECT_WORD**
         // This regex ensures we find the word with the exact capitalization present in the sentence.
-        const regex = new RegExp('\\*\\*' + correctWordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\*\\*', 'i');
+        const regex = new RegExp('\\*\\*(' + correctWordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')\\*\\*', 'i');
         
         // 2. Find the exact placeholder string, including its original capitalization
         const match = sentenceText.match(regex);
@@ -499,7 +508,7 @@
             // Capitalize the word for display on the tile if it was capitalized in the sentence, otherwise keep it as is.
             // This makes the tile look right for words starting sentences (like "They" or "What").
             const displayWord = (placeholderToSplit.startsWith('**') && placeholderToSplit.endsWith('**') && 
-                                 placeholderToSplit.substring(2, placeholderToSplit.length - 2) === word.charAt(0).toUpperCase() + word.slice(1)) 
+                                 placeholderToSplit.substring(2, placeholderToSplit.length - 2).toLowerCase() === word) 
                                  ? word.charAt(0).toUpperCase() + word.slice(1) : word;
 
 
@@ -535,10 +544,22 @@
         // loadSentence() now contains the logic to check for game completion
         loadSentence();
     }
+    
+    // Resets the game state and loads the first sentence
+    function resetGame() {
+        sentencesCompleted = 0;
+        score = 0;
+        updateScore(0); // Update score display
+        loadSentence(); // Start from the beginning
+        feedbackMessage.textContent = 'Game Reset. Ready to Play!';
+    }
+
 
     // Updates the score display
     function updateScore(points) {
         score += points;
+        // Clamp score at 0 to prevent negative scores on reset
+        score = Math.max(0, score); 
         scoreElement.textContent = score;
     }
 
@@ -611,6 +632,7 @@
             const nextSentenceIndex = sentencesCompleted + 1;
             // Checks if the next index is exactly a level boundary AND is not past the final sentence index
             const isLevelComplete = (nextSentenceIndex % SENTENCES_PER_LEVEL === 0) && (nextSentenceIndex < SENTENCE_DATA.length);
+            const isFinalSentence = nextSentenceIndex === SENTENCE_DATA.length; // Check if this was the final one
 
             // --- Sentence Reconstruction for Modal (Cleaner reading) ---
             
@@ -621,7 +643,10 @@
 
             // Wait for 1.5 seconds and show the appropriate modal
             setTimeout(() => {
-                if (isLevelComplete) {
+                if (isFinalSentence) {
+                    // Triggers the Game Over modal, which now has the new message
+                    loadNextLevel(); 
+                } else if (isLevelComplete) {
                     // Trigger confetti and special level-up modal
                     showConfetti();
                     const nextLevel = currentLevel + 1;
@@ -630,15 +655,7 @@
                 } else {
                     // Standard sentence solved modal
                     const modalMessage = `The complete sentence is: <span class="text-pet-blue font-extrabold text-2xl">"${cleanCompletedSentence}"</span>. You solved it! The pet pal is proud.`;
-                    
-                    // If this is the absolute final sentence, loadNextLevel() will trigger the Game Over modal,
-                    // so we only show the 'Pawsitively Perfect' one if we still have more regular sentences left.
-                    if (sentencesCompleted < SENTENCE_DATA.length - 1) {
-                         showModal("Pawsitively Perfect!", modalMessage, true);
-                    } else {
-                        // For the very last sentence (index 19), call loadNextLevel which triggers the Game Over modal
-                        loadNextLevel();
-                    }
+                    showModal("Pawsitively Perfect!", modalMessage, true);
                 }
             }, 1500);
 
