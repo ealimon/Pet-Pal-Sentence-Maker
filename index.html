@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Pal Sentence Maker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Confetti Library for Level Completion Celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'pet-pink': '#ff99c8',
+                        'pet-green': '#a9e34b',
+                        'pet-blue': '#4c93f0',
+                        'bg-park': '#b6e788',
+                    },
+                    fontFamily: {
+                        // Using a playful font stack
+                        sans: ['Blinker', 'Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Import a playful, legible font */
+        @import url('https://fonts.googleapis.com/css2?family=Blinker:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Blinker', sans-serif;
+            background: linear-gradient(to top, #65a30d, #b6e788); /* Park/Garden Gradient */
+            overflow: hidden; 
+        }
+
+        /* Custom styling for the draggable word tiles (Word Toys) */
+        .word-toy {
+            cursor: grab;
+            transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+            user-select: none;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+        }
+
+        .word-toy:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Styling for the sentence display words (Grass Patches/Pillows) */
+        .sentence-word {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 6rem;
+            height: 3.5rem;
+            margin: 0.35rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 2rem; /* Rounded pill shape */
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #27272a;
+            background-color: #fef08a; /* Soft Yellow Pillow */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s;
+        }
+
+        /* Styling for the drop zone */
+        .drop-zone {
+            background-color: rgba(255, 255, 255, 0.5);
+            border: 4px dashed #ff99c8; /* Pink dashed border */
+            color: #ff99c8;
+            font-style: italic;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .drop-zone.drag-over {
+            background-color: rgba(255, 153, 200, 0.3); /* Highlight when dragging over */
+            border-color: #f9fafb;
+        }
+
+        /* Utility class for the draggable items */
+        .draggable {
+            box-shadow: 0 0 0 4px #ff99c8; /* Pink border ring */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="w-full max-w-4xl bg-white bg-opacity-90 backdrop-blur-md p-6 sm:p-10 rounded-3xl shadow-2xl border-4 border-pet-pink text-gray-800 flex flex-col space-y-8">
+
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-pet-pink text-center mb-4 leading-tight tracking-wider">
+            🐾 Pet Pal Sentence Maker 🐶
+        </h1>
+
+        <!-- Instructions and Status -->
+        <div class="text-center text-lg sm:text-xl font-bold p-3 rounded-xl bg-pet-blue text-white shadow-inner">
+            <p id="instruction-text">
+                Drag the word toy to the empty spot to complete the sentence!
+            </p>
+        </div>
+
+        <!-- Sentence Display Area (The Pet's Blanket) -->
+        <div id="sentence-display" class="min-h-[10rem] flex flex-wrap items-center justify-center text-center p-6 border-4 border-dashed border-pet-green rounded-xl bg-gray-100 shadow-lg text-4xl sm:text-5xl font-extrabold transition-all duration-300">
+            <!-- Sentence parts and drop zone will be injected here -->
+        </div>
+
+        <!-- Feedback & Score Area -->
+        <div class="flex justify-between items-center text-2xl font-bold">
+            <!-- ADDED LEVEL DISPLAY -->
+            <p>Level: <span id="current-level" class="text-pet-green">1</span></p>
+            <p>Score: <span id="score" class="text-pet-pink">0</span></p>
+            <p id="feedback-message" class="text-xl italic text-pet-green">Ready to Play!</p>
+            
+            <!-- Removed speaker button, now relies on automatic sound feedback -->
+        </div>
+
+        <!-- Word Toy Pool (Draggable Options) -->
+        <div id="word-pool" class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-gray-200 shadow-xl border border-gray-300">
+            <!-- Word toys will be injected here -->
+        </div>
+
+        <!-- Message Modal (Replaces alert()) -->
+        <div id="modal-backdrop" class="hidden fixed inset-0 bg-black bg-opacity-70 items-center justify-center z-50">
+            <div id="message-modal" class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center text-gray-900 border-4 border-pet-pink transform scale-95 transition-transform duration-300">
+                <h3 id="modal-title" class="text-3xl font-bold mb-4 text-pet-blue"></h3>
+                <p id="modal-content" class="text-lg mb-6"></p>
+                <!-- UPDATED BUTTON TEXT -->
+                <button id="modal-close-button" class="bg-pet-pink text-white font-bold py-2 px-6 rounded-full hover:bg-pink-600 transition-all shadow-md">
+                    Fetch Next Sentence!
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+    // --- GLOBAL GAME STATE AND DATA ---
+
+    // The core sight word list, expanded to 20 sentences (10 per level)
+    const SENTENCE_DATA = [
+        // Level 1: Pre-Primer (Sentences 0-9)
+        {
+            sentence: "I **can** see the cat.",
+            correct: "can",
+            distractors: ["am", "big", "one"]
+        },
+        {
+            sentence: "Look at the **red** ball.",
+            correct: "red",
+            distractors: ["go", "run", "not"]
+        },
+        {
+            sentence: "We went to **the** park.",
+            correct: "the",
+            distractors: ["and", "a", "up"]
+        },
+        {
+            sentence: "I like to **go** outside.",
+            correct: "go",
+            distractors: ["is", "it", "away"]
+        },
+        {
+            sentence: "Look **at** the fish.",
+            correct: "at",
+            distractors: ["not", "on", "in"]
+        },
+        // NEW SENTENCES FOR LEVEL 1 (Pre-Primer)
+        {
+            sentence: "The **big** dog barked.",
+            correct: "big",
+            distractors: ["all", "do", "yellow"]
+        },
+        {
+            sentence: "I will **find** my toy.",
+            correct: "find",
+            distractors: ["come", "play", "must"]
+        },
+        {
+            sentence: "That joke was **funny**.",
+            correct: "funny",
+            distractors: ["little", "me", "out"]
+        },
+        {
+            sentence: "The cat is **in** the box.",
+            correct: "in",
+            distractors: ["said", "what", "went"]
+        },
+        {
+            sentence: "We like to **jump** high.",
+            correct: "jump",
+            distractors: ["he", "she", "new"]
+        },
+        
+        // Level 2: Primer (Sentences 10-19)
+        {
+            sentence: "He **said** hello to me.",
+            correct: "said",
+            distractors: ["came", "must", "but"]
+        },
+        {
+            sentence: "It is a **new** toy.",
+            correct: "new",
+            distractors: ["four", "like", "they"]
+        },
+        {
+            sentence: "I **am** happy today.",
+            correct: "am",
+            distractors: ["yes", "get", "black"]
+        },
+        // NEW SENTENCES FOR LEVEL 2 (Primer)
+        {
+            sentence: "You **must** clean your room.",
+            correct: "must",
+            distractors: ["with", "white", "pretty"]
+        },
+        {
+            // FIX: Capitalized word 'They' is in the sentence, but 'correct' is 'they'.
+            // The logic below will handle this by dynamically finding the capitalized version.
+            sentence: "**They** are playing outside.",
+            correct: "they",
+            distractors: ["who", "good", "have"]
+        },
+        {
+            sentence: "It **was** a fun day.",
+            correct: "was",
+            distractors: ["soon", "say", "so"]
+        },
+        {
+            sentence: "The coin is **under** the rug.",
+            correct: "under",
+            distractors: ["ride", "ran", "please"]
+        },
+        {
+            sentence: "I **want** a piece of cake.",
+            correct: "want",
+            distractors: ["well", "saw", "must"]
+        },
+        {
+            sentence: "We **went** home quickly.",
+            correct: "went",
+            distractors: ["ran", "did", "now"]
+        },
+        {
+            sentence: "**What** is your favorite color?",
+            correct: "what",
+            distractors: ["that", "there", "this"]
+        }
+    ];
+
+    const SENTENCES_PER_LEVEL = 10;
+    let currentLevel = 1;
+    let score = 0;
+    let sentencesCompleted = 0;
+    let currentSentenceData = {};
+    let isDragging = false;
+    let audioContext = null; 
+
+    // --- DOM ELEMENT REFERENCES ---
+    const sentenceDisplay = document.getElementById('sentence-display');
+    const wordPool = document.getElementById('word-pool');
+    const scoreElement = document.getElementById('score');
+    const levelElement = document.getElementById('current-level');
+    const feedbackMessage = document.getElementById('feedback-message');
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content');
+    const modalCloseButton = document.getElementById('modal-close-button');
+
+    // --- AUDIO FUNCTIONS (Web Audio API) ---
+
+    function initAudio() {
+        if (!audioContext) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('Web Audio API not supported in this browser:', e);
+            }
+        }
+    }
+    
+    // Initialize audio context on first interaction
+    document.addEventListener('click', initAudio, { once: true });
+    document.addEventListener('touchstart', initAudio, { once: true });
+
+    function playSound(type) {
+        if (!audioContext) return;
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Base volume
+
+        if (type === 'correct') {
+            // High-pitched chime
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+            oscillator.frequency.exponentialRampToValueAtTime(1320, audioContext.currentTime + 0.1); // C6
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.3);
+        } else if (type === 'incorrect') {
+            // Low-pitched boop
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(220, audioContext.currentTime); // A3
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+    }
+
+
+    // --- UTILITY FUNCTIONS ---
+
+    // Function to show a custom modal instead of alert()
+    function showModal(title, content, isHtml = false, isLevelUp = false) {
+        modalTitle.textContent = title;
+        
+        if (isHtml) {
+            modalContent.innerHTML = content;
+        } else {
+            modalContent.textContent = content;
+        }
+        
+        // Change button text for level up
+        modalCloseButton.textContent = isLevelUp ? "Continue to Next Level!" : "Fetch Next Sentence!";
+        
+        modalBackdrop.classList.remove('hidden');
+        modalBackdrop.classList.add('flex');
+        
+        modalCloseButton.onclick = () => {
+            modalBackdrop.classList.remove('flex');
+            modalBackdrop.classList.add('hidden');
+            // If it was a success modal (sentence solved or level up), load the next sentence
+            if (title.includes("Pawsitively Perfect!") || title.includes("LEVEL UP!")) {
+                loadNextLevel(); 
+            }
+            // Note: If the title is "Game Over!", loadNextLevel() is not called, which prevents the error.
+        };
+    }
+    
+    // Simple SVG for a Bone icon
+    function getBoneSVG() {
+        return `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 mr-2 text-white">
+                <path d="M10 2c-3.37 0-6 2.5-6 6s2.5 6 6 6c3.37 0 6-2.5 6-6s-2.5-6-6-6zM14 16c3.37 0 6-2.5 6-6s-2.5-6-6-6c-3.37 0-6 2.5-6 6s2.5 6 6 6zM6 8h12M4.5 9.5l-2-2M21.5 14.5l-2-2"/>
+            </svg>
+        `;
+    }
+    
+    // Simple SVG for a Ball icon
+    function getBallSVG() {
+        return `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8 mr-2 text-white">
+                <circle cx="12" cy="12" r="10" opacity="0.8"/>
+                <path fill="#000000" d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"/>
+            </svg>
+        `;
+    }
+
+    // --- CONFETTI FUNCTION ---
+    function showConfetti() {
+        if (typeof confetti === 'function') {
+            const defaults = {
+                spread: 360,
+                ticks: 100,
+                gravity: 0.5,
+                decay: 0.94,
+                startVelocity: 30,
+                scalar: 1.2,
+                shapes: ['square', 'circle'],
+                colors: ['#ff99c8', '#a9e34b', '#4c93f0', '#fef08a']
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(200 * particleRatio)
+                }));
+            }
+
+            fire(0.25, {
+                spread: 26,
+                startVelocity: 55,
+            });
+            fire(0.2, {
+                spread: 60,
+            });
+            fire(0.35, {
+                spread: 100,
+                decay: 0.91,
+                scalar: 0.8
+            });
+            fire(0.1, {
+                spread: 120,
+                startVelocity: 25,
+                decay: 0.92,
+                scalar: 1.2
+            });
+            fire(0.1, {
+                spread: 120,
+                startVelocity: 45,
+            });
+        }
+    }
+
+
+    // --- GAME LOGIC ---
+
+    // Initializes the current sentence puzzle
+    function loadSentence() {
+        // 1. Attempt to retrieve data for the current index
+        const data = SENTENCE_DATA[sentencesCompleted];
+
+        // If the data is undefined, it means we have run out of sentences (Game Over)
+        if (!data) {
+            showModal("Game Over!", "You've mastered all the Pet Pal sentences! Your final score is " + score + ".");
+            return;
+        }
+
+        // 2. Assign the valid data and proceed
+        currentSentenceData = data;
+        
+        // Calculate and update the current level
+        currentLevel = Math.floor(sentencesCompleted / SENTENCES_PER_LEVEL) + 1;
+        levelElement.textContent = currentLevel;
+
+        // --- FIX for Case Sensitivity Issue:
+        // Find the exact word (with correct capitalization) in the sentence string
+        const correctWordInSentence = currentSentenceData.sentence.match(new RegExp('\\*\\*(.*?)\\*\\*', 'i'))?.[1];
+        
+        // Create the exact placeholder string to split on (e.g., "**They**")
+        const placeholderToSplit = correctWordInSentence ? 
+            '**' + correctWordInSentence + '**' : 
+            '**' + currentSentenceData.correct + '**'; // Fallback if no match found (shouldn't happen)
+
+        // 1. Prepare sentence parts for injection
+        // Use the dynamically determined placeholder for splitting
+        const [part1, part2] = currentSentenceData.sentence.split(placeholderToSplit);
+
+        // 2. Clear and build the sentence display
+        sentenceDisplay.innerHTML = '';
+        
+        // Add part 1 (plain text)
+        part1.split(' ').filter(Boolean).forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'sentence-word bg-pet-blue text-white shadow-md ring-1 ring-blue-500';
+            span.textContent = word;
+            sentenceDisplay.appendChild(span);
+        });
+        
+        // Add the drop zone
+        const dropZone = document.createElement('div');
+        dropZone.id = 'drop-zone';
+        dropZone.className = 'sentence-word drop-zone text-4xl font-normal shadow-inner ring-4 ring-dashed ring-pet-pink hover:ring-pet-blue transition-all duration-300';
+        dropZone.textContent = '... DROP TOY ...';
+        // The target word remains the lowercase 'correct' property for matching the draggable tiles
+        dropZone.setAttribute('data-target-word', currentSentenceData.correct); 
+        dropZone.draggable = false;
+        sentenceDisplay.appendChild(dropZone);
+        
+        // Add part 2 (plain text)
+        part2.split(' ').filter(Boolean).forEach(word => {
+            const span = document.createElement('span');
+            span.className = 'sentence-word bg-pet-blue text-white shadow-md ring-1 ring-blue-500';
+            span.textContent = word;
+            sentenceDisplay.appendChild(span);
+        });
+
+        // 3. Populate the word pool with the correct word and distractors
+        const allWords = [currentSentenceData.correct, ...currentSentenceData.distractors];
+        const shuffledWords = allWords.sort(() => Math.random() - 0.5);
+        
+        wordPool.innerHTML = '';
+        shuffledWords.forEach((word, index) => {
+            const colors = ['bg-pet-pink', 'bg-pet-green', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500'];
+            const planetColor = colors[index % colors.length];
+            const isBone = Math.random() < 0.5; // Randomly choose bone or ball icon
+
+            const div = document.createElement('div');
+            div.className = `word-toy draggable ${planetColor} text-white text-2xl font-bold rounded-full p-4 sm:p-6 text-center shadow-lg transition-all duration-300 transform hover:scale-105 flex flex-col items-center justify-center min-h-[5rem]`;
+            div.innerHTML = (isBone ? getBoneSVG() : getBallSVG()) + word;
+            div.setAttribute('data-word', word);
+            div.draggable = true;
+            div.id = `word-tile-${word}`;
+            
+            // Add drag event listeners
+            div.addEventListener('dragstart', handleDragStart);
+            // Add touch event listeners for mobile dragging (manual implementation)
+            div.addEventListener('touchstart', handleTouchStart);
+            wordPool.appendChild(div);
+        });
+
+        // 4. Attach drag events to the drop zone
+        dropZone.addEventListener('dragover', handleDragOver);
+        dropZone.addEventListener('dragleave', handleDragLeave);
+        dropZone.addEventListener('drop', handleDrop);
+        
+        // 5. Attach touch events to the drop zone for touch devices
+        dropZone.addEventListener('touchmove', (e) => { e.preventDefault(); });
+        dropZone.addEventListener('touchend', handleTouchEnd);
+
+
+        feedbackMessage.textContent = 'New Treat!';
+    }
+    
+    // Loads the next sentence
+    function loadNextLevel() {
+        sentencesCompleted++;
+        // loadSentence() now contains the logic to check for game completion
+        loadSentence();
+    }
+
+    // Updates the score display
+    function updateScore(points) {
+        score += points;
+        scoreElement.textContent = score;
+    }
+
+    // --- DRAG AND DROP HANDLERS (Mouse/Desktop) ---
+
+    let draggedElement = null;
+
+    function handleDragStart(e) {
+        draggedElement = e.target.closest('.word-toy');
+        isDragging = true;
+        e.dataTransfer.setData('text/plain', draggedElement.getAttribute('data-word'));
+        draggedElement.classList.add('opacity-50', 'ring-8', 'ring-pet-pink');
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+
+        const droppedWord = e.dataTransfer.getData('text/plain');
+        const targetWord = e.currentTarget.getAttribute('data-target-word');
+
+        processDrop(droppedWord, targetWord, e.currentTarget);
+    }
+    
+    function processDrop(droppedWord, targetWord, dropZoneElement) {
+        if (draggedElement) {
+            draggedElement.classList.remove('opacity-50', 'ring-8', 'ring-pet-pink');
+            draggedElement = null;
+        }
+        
+        if (droppedWord === targetWord) {
+            // Correct Answer!
+            playSound('correct');
+            updateScore(10);
+            feedbackMessage.textContent = '🥳 Good Pal! Treat Earned!';
+            
+            // Replace the drop zone with the correct word tile
+            const correctWordSpan = document.createElement('span');
+            correctWordSpan.className = 'sentence-word bg-pet-green text-white shadow-xl animate-pulse';
+            correctWordSpan.textContent = droppedWord;
+            
+            dropZoneElement.parentNode.replaceChild(correctWordSpan, dropZoneElement);
+
+            // Hide all remaining word toys in the pool
+            Array.from(wordPool.children).forEach(child => {
+                child.classList.add('hidden');
+            });
+            
+            // --- Determine next step (Level Up or Next Sentence) ---
+            const nextSentenceIndex = sentencesCompleted + 1;
+            // Checks if the next index is exactly a level boundary AND is not past the final sentence index
+            const isLevelComplete = (nextSentenceIndex % SENTENCES_PER_LEVEL === 0) && (nextSentenceIndex < SENTENCE_DATA.length);
+
+            // --- Sentence Reconstruction for Modal (Cleaner reading) ---
+            const rawSentenceTemplate = SENTENCE_DATA[sentencesCompleted].sentence;
+            
+            // Replaces the placeholder using a regex that matches the bolded word regardless of case
+            const cleanCompletedSentence = rawSentenceTemplate
+                .replace(/\*\*.*?\*\*/, droppedWord) // Replace **word** with the dropped word
+                .trim();
+
+            // Wait for 1.5 seconds and show the appropriate modal
+            setTimeout(() => {
+                if (isLevelComplete) {
+                    // Trigger confetti and special level-up modal
+                    showConfetti();
+                    const nextLevel = currentLevel + 1;
+                    const levelUpMessage = `Amazing! You've mastered Level ${currentLevel}! Get ready for Level ${nextLevel}'s challenges!`;
+                    showModal("LEVEL UP!", levelUpMessage, false, true); // Last 'true' flag indicates a level up
+                } else {
+                    // Standard sentence solved modal
+                    const modalMessage = `The complete sentence is: <span class="text-pet-blue font-extrabold text-2xl">"${cleanCompletedSentence}"</span>. You solved it! The pet pal is proud.`;
+                    
+                    // If this is the absolute final sentence, loadNextLevel() will trigger the Game Over modal,
+                    // so we only show the 'Pawsitively Perfect' one if we still have more regular sentences left.
+                    if (sentencesCompleted < SENTENCE_DATA.length - 1) {
+                         showModal("Pawsitively Perfect!", modalMessage, true);
+                    } else {
+                        // For the very last sentence (index 19), call loadNextLevel which triggers the Game Over modal
+                        loadNextLevel();
+                    }
+                }
+            }, 1500);
+
+        } else {
+            // Incorrect Answer
+            playSound('incorrect');
+            updateScore(-5);
+            feedbackMessage.textContent = '❌ Woops! Try another toy.';
+            
+            // Visual error feedback on the drop zone
+            dropZoneElement.classList.add('ring-red-500', 'bg-red-500', 'bg-opacity-20');
+            setTimeout(() => {
+                dropZoneElement.classList.remove('ring-red-500', 'bg-red-500', 'bg-opacity-20');
+            }, 500);
+        }
+    }
+
+
+    // --- TOUCH HANDLERS (Mobile/Tablet) ---
+
+    let currentTouchTarget = null;
+    let touchStartX, touchStartY;
+    
+    function handleTouchStart(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        currentTouchTarget = e.currentTarget;
+        isDragging = true;
+        
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+
+        currentTouchTarget.classList.add('opacity-50', 'ring-8', 'ring-pet-pink');
+        
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    }
+
+    function handleTouchMove(e) {
+        if (!isDragging || !currentTouchTarget) return;
+        e.preventDefault();
+
+        const touch = e.touches[0];
+        const newX = touch.clientX - touchStartX;
+        const newY = touch.clientY - touchStartY;
+        
+        currentTouchTarget.style.transform = `translate(${newX}px, ${newY}px) scale(1.1)`;
+
+        const dropZone = document.getElementById('drop-zone');
+        const dropZoneRect = dropZone.getBoundingClientRect();
+
+        if (touch.clientX > dropZoneRect.left && touch.clientX < dropZoneRect.right &&
+            touch.clientY > dropZoneRect.top && touch.clientY < dropZoneRect.bottom) {
+            dropZone.classList.add('drag-over');
+        } else {
+            dropZone.classList.remove('drag-over');
+        }
+    }
+
+    function handleTouchEnd(e) {
+        if (!isDragging || !currentTouchTarget) return;
+
+        currentTouchTarget.classList.remove('opacity-50', 'ring-8', 'ring-pet-pink');
+        currentTouchTarget.style.transform = '';
+        document.removeEventListener('touchmove', handleTouchMove);
+        isDragging = false;
+
+        const touch = e.changedTouches[0];
+        const dropZone = document.getElementById('drop-zone');
+        const dropZoneRect = dropZone.getBoundingClientRect();
+
+        dropZone.classList.remove('drag-over');
+
+        if (touch.clientX > dropZoneRect.left && touch.clientX < dropZoneRect.right &&
+            touch.clientY > dropZoneRect.top && touch.clientY < dropZoneRect.bottom) {
+            
+            const droppedWord = currentTouchTarget.getAttribute('data-word');
+            const targetWord = dropZone.getAttribute('data-target-word');
+            
+            draggedElement = currentTouchTarget; 
+            processDrop(droppedWord, targetWord, dropZone);
+        }
+        
+        currentTouchTarget = null;
+    }
+
+
+    // --- INITIALIZATION ---
+
+    window.onload = function () {
+        // Start the game
+        loadSentence(); 
+    };
+
+</script>
+
+</body>
+</html>
